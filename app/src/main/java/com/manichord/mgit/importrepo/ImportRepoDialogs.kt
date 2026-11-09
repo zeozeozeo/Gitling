@@ -66,21 +66,6 @@ fun ImportRepoDialogs(viewModel: ImportRepoViewModel, onOpenRepo: (Repo) -> Unit
             onDismiss = viewModel::dismiss
         )
         is ImportRepoViewModel.State.Naming -> NameDialog(s, viewModel)
-        ImportRepoViewModel.State.FolderPermission -> DeviceFolderPermissionDialog(
-            onGranted = viewModel::startBrowsing,
-            onDismiss = viewModel::dismiss
-        )
-        is ImportRepoViewModel.State.Browsing -> DeviceFolderBrowserDialog(
-            state = s,
-            onNavigate = viewModel::browseTo,
-            onSelect = viewModel::openFolderInPlace,
-            onDismiss = viewModel::dismiss
-        )
-        is ImportRepoViewModel.State.Opened -> DeviceFolderOpenedDialog(
-            state = s,
-            onOpen = { viewModel.dismiss(); onOpenRepo(s.repo) },
-            onDismiss = viewModel::dismiss
-        )
         is ImportRepoViewModel.State.Importing -> ProgressDialog(s, onCancel = viewModel::cancelImport)
         is ImportRepoViewModel.State.Done -> DoneDialog(
             s,

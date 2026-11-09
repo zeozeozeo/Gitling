@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
@@ -71,7 +70,6 @@ fun RepoListScreen(
     onCloneClick: () -> Unit,
     onInitLocalClick: () -> Unit,
     onImportClick: () -> Unit,
-    onOpenDeviceFolderClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onConnectGitHubClick: () -> Unit
 ) {
@@ -171,8 +169,7 @@ fun RepoListScreen(
                 onExpandedChange = { addMenuExpanded = it },
                 onCloneClick = onCloneClick,
                 onInitLocalClick = onInitLocalClick,
-                onImportClick = onImportClick,
-                onOpenDeviceFolderClick = onOpenDeviceFolderClick
+                onImportClick = onImportClick
             )
         }
     ) { paddingValues ->
@@ -259,8 +256,7 @@ private fun AddRepositoryMenu(
     onExpandedChange: (Boolean) -> Unit,
     onCloneClick: () -> Unit,
     onInitLocalClick: () -> Unit,
-    onImportClick: () -> Unit,
-    onOpenDeviceFolderClick: () -> Unit
+    onImportClick: () -> Unit
 ) {
     val toggleLabel = stringResource(if (expanded) R.string.label_close_menu else R.string.label_add_repository)
     FloatingActionButtonMenu(
@@ -303,11 +299,6 @@ private fun AddRepositoryMenu(
             onClick = { onExpandedChange(false); onImportClick() },
             icon = { Icon(Icons.Default.FileOpen, contentDescription = null) },
             text = { Text(stringResource(R.string.label_import_repo)) }
-        )
-        FloatingActionButtonMenuItem(
-            onClick = { onExpandedChange(false); onOpenDeviceFolderClick() },
-            icon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
-            text = { Text(stringResource(R.string.label_menu_open_device_folder)) }
         )
     }
 }

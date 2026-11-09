@@ -22,6 +22,11 @@ public class PreferenceHelper {
     private static final String PRIVACY_ACCEPTED_KEY = "privacy.accepted";
     private static final int PRIVACY_ACCEPTED_VERSION = 1;
 
+    /** Where new clones/init-locals go; empty means the default app-private root. Distinct from
+     * pref_key_repo_root_location, which is the old custom root cleared by the storage
+     * migration. */
+    private static final String CLONE_ROOT_KEY = "clone_root_path";
+
     private final Context mContext;
 
     public PreferenceHelper(Context context) {
@@ -46,6 +51,20 @@ public class PreferenceHelper {
     public void setRepoRoot(String repoRootPath) {
         edit(mContext.getString(R.string.pref_key_repo_root_location), repoRootPath);
         Timber.d("set root:" + repoRootPath);
+    }
+
+    /**
+     * The folder new clones and init-locals are written to, chosen by the user through the
+     * filesystem browser. Returns null when the default app root is used.
+     */
+    public File getCloneRoot() {
+        String path = getString(CLONE_ROOT_KEY);
+        return path == null || path.isEmpty() ? null : new File(path);
+    }
+
+    public void setCloneRoot(String path) {
+        edit(CLONE_ROOT_KEY, path == null ? "" : path);
+        Timber.d("set clone root:" + path);
     }
 
     public void setPrivacyAccepted() {

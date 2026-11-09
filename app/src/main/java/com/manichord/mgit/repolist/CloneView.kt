@@ -2,6 +2,14 @@
 
 package com.manichord.mgit.repolist
 
+import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -15,12 +23,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.manichord.mgit.clone.CloneViewModel
+import com.manichord.mgit.common.DeviceStorageAccess
+import com.manichord.mgit.common.SafPaths
 import com.manichord.mgit.models.Account
 import com.manichord.mgit.models.AccountType
 import com.manichord.mgit.models.GitHubRepo
@@ -51,6 +62,39 @@ fun CloneView(
     val localRepoNameError by viewModel.localRepoNameError.observeAsState()
 
     val cloneLocation by viewModel.cloneLocation.observeAsState("")
+    val cloneRoot by viewModel.cloneRoot.observeAsState()
+    val context = LocalContext.current
+
+    val treePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            val dir = SafPaths.resolveTreePath(uri)
+            if (dir != null) {
+                viewModel.setCloneRoot(dir)
+            } else {
+                Toast.makeText(context, R.string.error_folder_not_on_device, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    val allFilesLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (DeviceStorageAccess.isGranted(context)) {
+            treePicker.launch(null)
+        } else {
+            Toast.makeText(context, R.string.error_all_files_access_needed, Toast.LENGTH_LONG).show()
+        }
+    }
+    val legacyPermissionsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        if (DeviceStorageAccess.isGranted(context)) {
+            treePicker.launch(null)
+        } else {
+            Toast.makeText(context, R.string.error_all_files_access_needed, Toast.LENGTH_LONG).show()
+        }
+    }
 
     Column(
         modifier = modifier
@@ -170,7 +214,45 @@ fun CloneView(
             lineLimits = TextFieldLineLimits.SingleLine,
             shape = MaterialTheme.shapes.medium
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(id = R.string.label_clone_destination),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = cloneLocation,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            TextButton(onClick = {
+                when {
+                    DeviceStorageAccess.isGranted(context) -> treePicker.launch(null)
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> try {
+                        allFilesLauncher.launch(DeviceStorageAccess.allFilesSettingsIntent(context))
+                    } catch (e: ActivityNotFoundException) {
+                        allFilesLauncher.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                    }
+                    else -> legacyPermissionsLauncher.launch(arrayOf(
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ))
+                }
+            }) {
+                Text(stringResource(id = R.string.label_change_folder))
+            }
+            if (cloneRoot != null) {
+                TextButton(onClick = { viewModel.setCloneRoot(null) }) {
+                    Text(stringResource(id = R.string.label_use_default_folder))
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Options
         Surface(
@@ -229,6 +311,7 @@ fun CloneView(
         }
 
     }
+
 }
 
 @Composable

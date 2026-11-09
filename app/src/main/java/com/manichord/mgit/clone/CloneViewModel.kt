@@ -3,6 +3,7 @@ package com.manichord.mgit.clone
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
+import java.io.File
 import me.sheimi.sgit.MGitApplication
 import me.sheimi.sgit.R
 import me.sheimi.sgit.database.models.Repo
@@ -22,6 +23,8 @@ class CloneViewModel(application: Application) : AndroidViewModel(application) {
 
     val localRepoName : MutableLiveData<String> = MutableLiveData()
     val cloneLocation : MutableLiveData<String> = MutableLiveData()
+    /** User-chosen destination folder for new repos; null means the default app root. */
+    val cloneRoot : MutableLiveData<File?> = MutableLiveData()
     var cloneRecursively : Boolean = false
     val initLocal : MutableLiveData<Boolean> = MutableLiveData()
 
@@ -57,13 +60,18 @@ class CloneViewModel(application: Application) : AndroidViewModel(application) {
         accountManager.accountsChanged.observeForever(accountsChangedObserver)
     }
 
-    /** Display-only -- repos always clone into the current default root (no folder picker; see
-     * CloneView), so this just shows the user where that currently is. Must be re-read every
-     * time the clone sheet opens, not just once at ViewModel construction (this ViewModel
-     * outlives any single sheet open/close, and the default root can change via the "make repos
-     * visible to other apps" Settings toggle without the app restarting in between). */
+    /** Re-reads the destination every time the clone sheet opens: it can change here (the
+     * folder picker) and via the "make repos visible to other apps" Settings toggle. */
     fun refreshCloneLocation() {
-        cloneLocation.value = Repo.getDefaultRepoRootDir().absolutePath
+        val custom = getApplication<MGitApplication>().prefenceHelper?.getCloneRoot()
+        cloneRoot.value = custom
+        cloneLocation.value = (custom ?: Repo.getDefaultRepoRootDir()).absolutePath
+    }
+
+    /** Sets (or clears, with null) the folder new repos are written to. The choice persists. */
+    fun setCloneRoot(dir: File?) {
+        getApplication<MGitApplication>().prefenceHelper?.setCloneRoot(dir?.absolutePath)
+        refreshCloneLocation()
     }
 
     override fun onCleared() {
@@ -118,7 +126,7 @@ class CloneViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             Timber.d("CLONE REPO %s %s [%b]", localRepoName.value, remoteUrl, cloneRecursively)
             val repoName = localRepoName.value ?: ""
-            val repo = Repo.createRepo(repoName, remoteUrl, "")
+            val repo = Repo.createRepo(repoLocalPath(repoName), remoteUrl, "")
 
             selectedAccount.value?.let { account ->
                 repo.username = account.username
@@ -141,9 +149,16 @@ class CloneViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun initLocalRepo() {
-        val repo = Repo.createRepo(localRepoName.value, "local repository", "")
+        val repo = Repo.createRepo(repoLocalPath(localRepoName.value ?: ""), "local repository", "")
         val task = InitLocalTask(repo)
         task.executeTask()
+    }
+
+    /** A bare name for the default root, or an external:// absolute path when the user picked
+     * a destination folder; Repo.getDir() already resolves both. */
+    private fun repoLocalPath(name: String): String {
+        val root = cloneRoot.value ?: return name
+        return Repo.EXTERNAL_PREFIX + File(root, name).absolutePath
     }
 
     private fun stripUrlFromRepo(remoteUrl: String): String {
@@ -184,7 +199,7 @@ class CloneViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val prefsHelper = (getApplication<MGitApplication>()).prefenceHelper
-        val file = Repo.getDir(prefsHelper, localName)
+        val file = cloneRoot.value?.let { File(it, localName) } ?: Repo.getDir(prefsHelper, localName)
         if (file.exists()) {
             localRepoNameError.value = getApplication<MGitApplication>().getString((R.string.alert_localpath_repo_exists))
             return false

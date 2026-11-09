@@ -132,7 +132,6 @@ fun RepoListComposeContent(
                 showCloneSheet = true
             },
             onImportClick = { importRepoViewModel.start() },
-            onOpenDeviceFolderClick = { importRepoViewModel.startDeviceFolder() },
             onSettingsClick = {
                 (activity as MainActivity).openUserSettings()
             },
