@@ -1,17 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="1" android:versionName="1">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:versionCode="1" android:versionName="1">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Opening a repository folder outside Gitling's own storage (e.g. Documents/something)
+         in place: JGit needs real java.io.File paths, which scoped storage only allows with
+         all-files access. Requested only when the user chooses that action, never at startup.
+         This is deliberately not used for ordinary repos, which stay in app storage. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <!-- Below Android 11 all-files access is the old READ/WRITE_EXTERNAL_STORAGE runtime grant. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <!-- Requested lazily (see SheimiFragmentActivity.requestMediaFileAccess) only when a diff,
          stage or repo move actually hits the scoped-storage EACCES this works around (see
          FsUtils.findEaccesFile), and only below API 33. On API 33+ the equivalent would be
          READ_MEDIA_IMAGES, which Google Play's photo and video permissions policy doesn't allow
          for this use; there Gitling gets one-time folder access through the system picker
          instead and replaces each blocked file with its own copy (see BlockedFileRepair). -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
-    <application android:name=".MGitApplication" android:allowBackup="true" android:largeHeap="true" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:logo="@drawable/ic_launcher" android:label="@string/app_name" android:theme="@style/AppTheme">
+    <application android:name=".MGitApplication" android:allowBackup="true" android:largeHeap="true" android:requestLegacyExternalStorage="true" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:logo="@drawable/ic_launcher" android:label="@string/app_name" android:theme="@style/AppTheme">
         <activity android:name="com.manichord.mgit.MainActivity" android:label="@string/app_name" android:exported="true" android:launchMode="singleTask" android:configChanges="orientation|keyboardHidden|screenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

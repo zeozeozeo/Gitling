@@ -91,6 +91,23 @@ object RepoImporter {
         checkFolderIsRepo(context, treeUri, rootId, listChildren(context, treeUri, rootId))
     }
 
+    /** Same checks as [checkFolder], for a folder reached by a real filesystem path (the
+     * "open in place" route, which needs all-files access instead of a picker grant). Only lists
+     * the folder itself. */
+    fun checkFolder(dir: File) {
+        if (!dir.isDirectory) throw ImportException(Problem.READ_FAILED, "${dir.absolutePath} isn't a folder")
+        val names = dir.list()?.toSet() ?: throw ImportException(Problem.READ_FAILED,
+            "Can't read ${dir.absolutePath}")
+        val dotGit = File(dir, ".git")
+        when {
+            dotGit.isDirectory -> return
+            dotGit.exists() -> throw ImportException(Problem.GIT_FILE)
+            looksLikeGitDir(names) -> throw ImportException(
+                if (dir.name == ".git") Problem.PICKED_GIT_DIR else Problem.BARE_REPO)
+            else -> throw ImportException(Problem.NOT_A_REPO)
+        }
+    }
+
     fun importFolder(context: Context, treeUri: Uri, destDir: File, progress: ProgressListener,
                      isCancelled: () -> Boolean): Result {
         val resolver = context.contentResolver

@@ -2,6 +2,7 @@
 
 package com.manichord.mgit.importrepo
 
+import android.content.Context
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import android.os.Build
@@ -65,6 +66,21 @@ fun ImportRepoDialogs(viewModel: ImportRepoViewModel, onOpenRepo: (Repo) -> Unit
             onDismiss = viewModel::dismiss
         )
         is ImportRepoViewModel.State.Naming -> NameDialog(s, viewModel)
+        ImportRepoViewModel.State.FolderPermission -> DeviceFolderPermissionDialog(
+            onGranted = viewModel::startBrowsing,
+            onDismiss = viewModel::dismiss
+        )
+        is ImportRepoViewModel.State.Browsing -> DeviceFolderBrowserDialog(
+            state = s,
+            onNavigate = viewModel::browseTo,
+            onSelect = viewModel::openFolderInPlace,
+            onDismiss = viewModel::dismiss
+        )
+        is ImportRepoViewModel.State.Opened -> DeviceFolderOpenedDialog(
+            state = s,
+            onOpen = { viewModel.dismiss(); onOpenRepo(s.repo) },
+            onDismiss = viewModel::dismiss
+        )
         is ImportRepoViewModel.State.Importing -> ProgressDialog(s, onCancel = viewModel::cancelImport)
         is ImportRepoViewModel.State.Done -> DoneDialog(
             s,
@@ -220,18 +236,8 @@ private fun DoneDialog(state: ImportRepoViewModel.State.Done, onOpen: () -> Unit
 
 @Composable
 private fun FailedDialog(state: ImportRepoViewModel.State.Failed, onDismiss: () -> Unit) {
-    val message = when (state.problem) {
-        RepoImporter.Problem.NOT_A_REPO -> stringResource(R.string.error_import_not_a_repo)
-        RepoImporter.Problem.PICKED_GIT_DIR -> stringResource(R.string.error_import_picked_git_dir)
-        RepoImporter.Problem.BARE_REPO -> stringResource(R.string.error_import_bare)
-        RepoImporter.Problem.GIT_FILE -> stringResource(R.string.error_import_git_file)
-        RepoImporter.Problem.ZIP_NO_REPO -> stringResource(R.string.error_import_zip_no_repo)
-        RepoImporter.Problem.ZIP_MULTIPLE_REPOS -> stringResource(R.string.error_import_zip_multiple)
-        RepoImporter.Problem.ZIP_INVALID -> stringResource(R.string.error_import_zip_invalid)
-        RepoImporter.Problem.NO_SPACE -> stringResource(R.string.error_import_no_space)
-        RepoImporter.Problem.READ_FAILED, RepoImporter.Problem.CANCELLED ->
-            stringResource(R.string.error_import_read_failed, state.detail ?: "")
-    }
+    val context = LocalContext.current
+    val message = importProblemMessage(context, state.problem, state.detail)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dialog_import_failed_title)) },
@@ -241,3 +247,18 @@ private fun FailedDialog(state: ImportRepoViewModel.State.Failed, onDismiss: () 
         }
     )
 }
+
+/** One message per [RepoImporter.Problem], shared by the import and open-in-place flows. */
+internal fun importProblemMessage(context: Context, problem: RepoImporter.Problem, detail: String?): String =
+    when (problem) {
+        RepoImporter.Problem.NOT_A_REPO -> context.getString(R.string.error_import_not_a_repo)
+        RepoImporter.Problem.PICKED_GIT_DIR -> context.getString(R.string.error_import_picked_git_dir)
+        RepoImporter.Problem.BARE_REPO -> context.getString(R.string.error_import_bare)
+        RepoImporter.Problem.GIT_FILE -> context.getString(R.string.error_import_git_file)
+        RepoImporter.Problem.ZIP_NO_REPO -> context.getString(R.string.error_import_zip_no_repo)
+        RepoImporter.Problem.ZIP_MULTIPLE_REPOS -> context.getString(R.string.error_import_zip_multiple)
+        RepoImporter.Problem.ZIP_INVALID -> context.getString(R.string.error_import_zip_invalid)
+        RepoImporter.Problem.NO_SPACE -> context.getString(R.string.error_import_no_space)
+        RepoImporter.Problem.READ_FAILED, RepoImporter.Problem.CANCELLED ->
+            context.getString(R.string.error_import_read_failed, detail ?: "")
+    }

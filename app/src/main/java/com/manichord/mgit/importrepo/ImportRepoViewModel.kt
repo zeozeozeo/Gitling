@@ -2,6 +2,7 @@ package com.manichord.mgit.importrepo
 
 import android.app.Application
 import android.net.Uri
+import android.os.Environment
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import java.io.File
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import me.sheimi.sgit.MGitApplication
 import me.sheimi.sgit.R
 import me.sheimi.sgit.database.RepoContract
+import me.sheimi.sgit.database.RepoDbManager
 import me.sheimi.sgit.database.models.Repo
 import timber.log.Timber
 
@@ -24,6 +26,12 @@ class ImportRepoViewModel(application: Application) : AndroidViewModel(applicati
         object Hidden : State()
         /** What importing does and its limits, with the folder / ZIP choice. */
         object Intro : State()
+        /** Explains the all-files access the "open in place" route needs. */
+        object FolderPermission : State()
+        /** Browsing device storage at [path], to open a repository there without copying it. */
+        data class Browsing(val path: String) : State()
+        /** A folder outside app storage was registered in place; nothing was copied. */
+        data class Opened(val repo: Repo) : State()
         data class Naming(val source: Uri, val isZip: Boolean, val name: String, val error: String?) : State()
         data class Importing(val name: String, val isZip: Boolean, val done: Long, val total: Long) : State()
         data class Done(val repo: Repo, val result: RepoImporter.Result) : State()
@@ -37,6 +45,53 @@ class ImportRepoViewModel(application: Application) : AndroidViewModel(applicati
 
     fun start() {
         _state.value = State.Intro
+    }
+
+    /** The "open a folder on this device" route, before the access prompt. */
+    fun startDeviceFolder() {
+        _state.value = State.FolderPermission
+    }
+
+    /** Access was granted; start browsing at the root of shared storage. */
+    fun startBrowsing() {
+        @Suppress("DEPRECATION") // the standard root still works with all-files access
+        val root = Environment.getExternalStorageDirectory()
+        _state.value = State.Browsing(root.absolutePath)
+    }
+
+    fun browseTo(dir: File) {
+        _state.value = State.Browsing(dir.absolutePath)
+    }
+
+    /** Registers [dir] as an external repo -- Gitling works in it directly, nothing is copied.
+     * The caller validates it first so a bad pick can be corrected in the browser; this repeats
+     * the check off the main thread before touching the database. */
+    fun openFolderInPlace(dir: File) {
+        _state.value = State.Hidden
+        Thread {
+            val app = getApplication<MGitApplication>()
+            try {
+                RepoImporter.checkFolder(dir)
+                val externalPath = Repo.EXTERNAL_PREFIX + dir.absolutePath
+                val existing = Repo.getRepoList(app, RepoDbManager.queryAllRepo())
+                    .firstOrNull { it.localPath == externalPath }
+                if (existing != null) {
+                    _state.value = State.Opened(existing)
+                    return@Thread
+                }
+                val repo = Repo.createRepo(externalPath, "", RepoContract.REPO_STATUS_NULL)
+                if (repo.remoteOriginURL.isNotEmpty()) {
+                    repo.updateRemote()
+                }
+                repo.updateLatestCommitInfo()
+                _state.value = State.Opened(Repo.getRepoById(repo.getID().toLong()))
+            } catch (e: RepoImporter.ImportException) {
+                _state.value = State.Failed(e.problem, e.detail)
+            } catch (e: Exception) {
+                Timber.e(e, "Couldn't open %s in place", dir)
+                _state.value = State.Failed(RepoImporter.Problem.READ_FAILED, e.message ?: e.javaClass.simpleName)
+            }
+        }.start()
     }
 
     fun dismiss() {
